@@ -241,3 +241,66 @@ tsconfig.json
 }
 ```
 
+## Step 5 - 
+- Initializing a web socket (ws) server and http (express) server
+
+```sh
+mkdir ./apps/ws-backend/src
+mkdir ./apps/http-backend/src
+
+touch ./apps/ws-backend/src/index.ts
+touch ./apps/http-backend/src/index.ts
+```
+
+- WS server
+```sh
+cd ./apps/ws-backend
+pnpm add ws @types/ws
+```
+ws-backend/src/index.ts
+```typescript
+import { WebSocketServer } from "ws"
+import http from "http"
+
+const server = http.createServer()
+const wss = new WebSocketServer({ server })
+
+const PORT = process.env.PORT || 8080
+
+server.listen(PORT , () => {
+  console.log(` WS Server is running on PORT: ${PORT}`)
+})
+
+wss.on('connection', function connection(ws)=> {
+  ws.on('error', console.error)
+
+  ws.on('message', function message(data)=>{
+    console.log('Message: %s', data )
+    ws.send("Pong")
+  })
+})
+```
+
+- HTTP server
+```sh
+cd ./apps/http-backend
+pnpm add express @types/express
+```
+
+http-backend/src/index.ts
+```typescript
+import express from "express"
+
+const app = express()
+
+app.get("/", (req,res) => {
+  res.json({
+    message: "Hello World"
+  })
+})
+
+app.listen(3001, ()=>{
+  console.log("HTTP Server is running on Port 3001")
+})
+```
+

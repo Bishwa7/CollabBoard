@@ -10,7 +10,9 @@
     "dev": "pnpm run build && pnpm run start"
   },
   "dependencies": {
-    "@repo/typescript-config": "workspace:*"
+    "@repo/typescript-config": "workspace:*",
+    "@types/express": "^5.0.6",
+    "express": "^5.2.1"
   },
   "keywords": [],
   "author": "",
