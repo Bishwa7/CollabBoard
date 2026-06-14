@@ -190,3 +190,30 @@ mkdir ws-backend
 cd ws-backend
 npm init -y
 ```
+
+## Step 3 -
+- create tsconfig.json file for ws-backend & http-backend and extend ./packages/typescript-config/base.json in them
+-  add the @repo/typescript-config (./packages/typescript-config) as a dependency in the package,json for ws-backend and http-backend
+
+```sh
+cd ws-backend
+touch tsconfig.json
+
+cd http-backend
+touch tsconfig.json
+```
+
+- tsconfig.json (ws-backend & http-backend)
+```typescript
+{
+    "extends": "@repo/typescript-config/base.json"
+}
+```
+
+- package.json (ws-backend & http-backend)
+```typescript
+"dependencies": {
+    "@repo/typescript-config" : "workspace:*"
+  },
+```
+
