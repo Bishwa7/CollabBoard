@@ -217,3 +217,27 @@ touch tsconfig.json
   },
 ```
 
+## Step 4 -
+- Added a build, start & dev script for ws-backend & http-backend
+
+
+package.json
+
+```typescript
+"scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "dev": "pnpm run build && pnpm run start"
+  },
+```
+
+tsconfig.json
+
+```typescript
+"compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist"
+}
+```
+
