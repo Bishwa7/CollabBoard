@@ -304,3 +304,69 @@ app.listen(3001, ()=>{
 })
 ```
 
+
+
+## Step 6 - 
+- Initialized project-level turbo.json to define the destination where turbo expects the outputs for project (eg: "dist/**")
+- run "pnpm turbo run build --dry" for dry running build script and check the "outputs" for each project
+
+root/turbo.json
+```typescript
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+http-backend/turbo.json
+```typescript
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "outputs": ["dist/**"]
+    }
+  }
+}
+```
+
+ws-backend/turbo.json
+```typescript
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "outputs": ["dist/**"]
+    }
+  }
+}
+```
+
+web/turbo.json
+```typescript
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
+    }
+  }
+}
+```
+
