@@ -370,3 +370,262 @@ web/turbo.json
 }
 ```
 
+## Step 7 - 
+- created a db package for common prisma7 with postgressql
+
+```ssh
+mkdir packages/db
+
+cd packages/db
+
+pnpm init
+
+touch tsconfig.json
+
+pnpm add typescript tsx @types/node --save-dev
+
+pnpm add prisma @types/pg --save-dev
+pnpm add @prisma/client @prisma/adapter-pg pg dotenv
+```
+
+packages/db/tsconfig.json
+```typescript
+
+{
+    "extends": "@repo/typescript-config/base.json",
+    "compilerOptions": {
+  
+    // "rootDir": "./src",
+    // "outDir": "./dist",
+
+
+    // "module": "esnext",
+    // "moduleResolution": "bundler",
+    // Try this if above not works --
+    // "module": "nodenext",
+    // "moduleResolution": "nodenext",
+
+
+    // "target": "ES2023",
+    
+    
+    // For nodejs:
+    "lib": ["esnext"],
+    "types": ["node"],
+    // and npm install -D @types/node
+
+    // Other Outputs
+    // "sourceMap": true,
+    // "declaration": true,
+    // "declarationMap": true,
+
+    // Stricter Typechecking Options
+    // "noUncheckedIndexedAccess": true,
+    // "exactOptionalPropertyTypes": true,
+
+    // Style Options
+    // "noImplicitReturns": true,
+    // "noImplicitOverride": true,
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    // "noFallthroughCasesInSwitch": true,
+    // "noPropertyAccessFromIndexSignature": true,
+
+    // Recommended Options
+    // "strict": true,
+    // "jsx": "react-jsx",
+    // "verbatimModuleSyntax": true,
+    // "isolatedModules": true,
+    // "noUncheckedSideEffectImports": true,
+    // "moduleDetection": "force",
+    // "skipLibCheck": true,
+
+    // "esModuleInterop": true,
+    "ignoreDeprecations" : "6.0"   
+  }
+}
+```
+
+
+packages/db/package.json
+```typescript
+
+{
+  "name": "@repo/db",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "exports":{
+    "./client":"./src/index.ts"
+  },
+  "scripts": {
+    "db:test": "tsx src/index.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.8.0",
+    "tsx": "^4.22.4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.22.0"
+  }
+}
+
+```
+
+packages/db
+```ssh
+npx prisma init
+```
+
+- update packages/db/prisma.config.ts
+```typescript
+import "dotenv/config";
+import { defineConfig } from "prisma/config";
+
+
+const databaseUrl = process.env["DATABASE_URL"];
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not set in .env");
+}
+
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
+  datasource: {
+    url: databaseUrl,
+  },
+});
+```
+
+prisma/schema.prisma
+
+- change output & define schema 
+
+```prisma
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+
+model User {
+  id        Int     @id @default(autoincrement())
+  email     String  @unique
+  username  String
+  password  String
+  photo     String
+
+  rooms      Room[]
+  chats      Chat[]
+}
+
+model Room {
+  id        Int       @id @default(autoincrement())
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  adminId   Int
+
+  chats      Chat[]
+
+  admin     User      @relation(fields: [adminId], references: [id])
+}
+
+model Chat {
+  id        Int     @id @default(autoincrement())
+  message   String
+  roomId    Int
+  userId    Int
+
+  room      Room    @relation(fields: [roomId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+}
+```
+
+```ssh
+npx prisma migrate dev
+
+npx prisma generate
+```
+
+src/client.ts
+```typescript
+import { PrismaClient } from "../prisma/generated/client"; 
+import { PrismaPg } from "@prisma/adapter-pg"; 
+
+
+const globalForPrisma = global as unknown as { prisma: PrismaClient; };
+
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL, 
+}); 
+
+const prisma = globalForPrisma.prisma || new PrismaClient({ adapter, });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma; 
+export default prisma; 
+```
+
+src/index.ts
+```typescript
+export * from './client';
+```
+
+
+packages/db/package.json
+
+- added "exports:{ "./client": "./src/index.ts" }"
+
+```typescript
+
+{
+  "name": "@repo/db",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "exports":{
+    "./client":"./src/index.ts"
+  },
+  "scripts": {
+    "db:test": "tsx src/index.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.8.0",
+    "tsx": "^4.22.4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.22.0"
+  }
+}
+
+```
