@@ -3,6 +3,7 @@ import express from "express"
 import cors from "cors"
 import userRouter from "./routes/user"
 import { secret } from "@repo/backend-common/config";
+import roomRouter from "./routes/room";
 
 const app = express()
 app.use(express.json())
@@ -10,7 +11,7 @@ app.use(cors())
 
 
 app.use("/api/v1/user", userRouter)
-
+app.use("/api/v1/room", roomRouter)
 
 
 async function main(){

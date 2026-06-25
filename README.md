@@ -697,7 +697,13 @@ tsconfig.josn
 src/jwt/jwtSecret.ts
 
 ```typescript
-export const JWT_SECRET = process.env.JWT_SECRET;
+const jwt_secret = process.env.JWT_SECRET;
+
+if(!jwt_secret){
+    throw new Error("JWT Secret Missing")
+}
+
+export const JWT_SECRET: string = jwt_secret;
 ```
 
 src/index.ts
@@ -1003,5 +1009,151 @@ export default userRouter;
 ```
 DATABASE_URL="database://getADatabaseURL.com"
 JWT_SECRET=SecretForJwtToken
+```
+
+## Step 10 -
+- added userAuthMiddleware.ts
+- created room/create api endpoint in http-backend to create chat/collab room (create room logic)
+
+
+src/middlewares/userAuthMiddleware.ts
+```typescript
+import jwt from "jsonwebtoken"
+import type { NextFunction, Request, Response } from "express"
+import { secret } from "@repo/backend-common/config"
+
+
+export const userAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
+
+    const authHeader = req.headers["authorization"]
+
+    if(!authHeader || !authHeader.startsWith("Bearer ")){
+        return res.status(400).json({
+            message: "Authorization header is missing or malformed"
+        })
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    if(!token){
+        return res.status(400).json({
+            message: "Authorization header is missing or malformed"
+        })
+    }
+
+    try{
+        const decoded = jwt.verify(token, secret.JWT_SECRET) as {id?:number}
+
+        if(!decoded.id){
+            return res.status(400).json({
+                message: "Invalid Token Payload"
+            })
+        }
+
+        // req.userId declared in routes/room.ts as this middleware is used there
+        req.userId = decoded.id
+        next();
+    }
+    catch(err){
+        console.error(err)
+        return res.status(400).json({
+            message: "Error in user auth middleware",
+            message2: "Invalid or expired token"
+        })
+    }
+}
+```
+
+
+src/routes/room.ts
+
+```typescript
+declare global{
+    namespace Express{
+        export interface Request{
+            userId:number;
+        }
+    }
+}
+
+
+import { CreateRoomSchema } from "@repo/common/types";
+import { Router } from "express";
+import { userAuthMiddleware } from "../middlewares/userAuthMiddleware";
+import { prisma } from "@repo/db/client";
+
+
+const roomRouter: Router = Router();
+
+
+roomRouter.post("/create", userAuthMiddleware, async (req, res) => {
+
+    try{
+        const parsedData = CreateRoomSchema.safeParse(req.body)
+
+        if(!parsedData.success){
+            return res.status(400).json({
+                message: "Invalid create room data",
+                error: parsedData.error
+            })
+        }
+
+        const userId = req.userId
+
+        const room = await prisma.room.create({
+            data:{
+                slug: parsedData.data.name,
+                adminId: userId
+            }
+        })
+
+        res.status(200).json({
+            message: "Chat Room created successfully",
+            roomId: room.id
+        })
+    }
+    catch(err){
+        console.error(err);
+
+        res.status(400).json({
+            message: "Error while creating room",
+            message2: "Duplicate Room name, name needs to be unique",
+            error: err
+        })
+    }    
+
+})
+
+
+export default roomRouter;
+```
+
+src/index.ts
+
+```typescript
+import "dotenv/config";
+import express from "express"
+import cors from "cors"
+import userRouter from "./routes/user"
+import { secret } from "@repo/backend-common/config";
+import roomRouter from "./routes/room";
+
+const app = express()
+app.use(express.json())
+app.use(cors())
+
+
+app.use("/api/v1/user", userRouter)
+app.use("/api/v1/room", roomRouter)
+
+
+async function main(){
+
+    app.listen(3001, ()=> {
+        console.log("Http Server is running on port 3001")
+    })
+}
+
+main().catch(err => console.log(err));
 ```
 
