@@ -195,7 +195,7 @@ npm init -y
 - create tsconfig.json file for ws-backend & http-backend and extend ./packages/typescript-config/base.json in them
 -  add the @repo/typescript-config (./packages/typescript-config) as a dependency in the package,json for ws-backend and http-backend
 
-```sh
+```ssh
 cd ws-backend
 touch tsconfig.json
 
@@ -204,14 +204,14 @@ touch tsconfig.json
 ```
 
 - tsconfig.json (ws-backend & http-backend)
-```typescript
+```json
 {
     "extends": "@repo/typescript-config/base.json"
 }
 ```
 
 - package.json (ws-backend & http-backend)
-```typescript
+```json
 "dependencies": {
     "@repo/typescript-config" : "workspace:*"
   },
@@ -223,7 +223,7 @@ touch tsconfig.json
 
 package.json
 
-```typescript
+```json
 "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc -b",
@@ -234,7 +234,7 @@ package.json
 
 tsconfig.json
 
-```typescript
+```json
 "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist"
@@ -311,7 +311,7 @@ app.listen(3001, ()=>{
 - run "pnpm turbo run build --dry" for dry running build script and check the "outputs" for each project
 
 root/turbo.json
-```typescript
+```json
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
@@ -335,7 +335,7 @@ root/turbo.json
 ```
 
 http-backend/turbo.json
-```typescript
+```json
 {
   "extends": ["//"],
   "tasks": {
@@ -347,7 +347,7 @@ http-backend/turbo.json
 ```
 
 ws-backend/turbo.json
-```typescript
+```json
 {
   "extends": ["//"],
   "tasks": {
@@ -359,7 +359,7 @@ ws-backend/turbo.json
 ```
 
 web/turbo.json
-```typescript
+```json
 {
   "extends": ["//"],
   "tasks": {
@@ -371,7 +371,7 @@ web/turbo.json
 ```
 
 ## Step 7 - 
-- created a db package for common prisma7 with postgressql
+- created a db package for common db with prisma7 (postgressql)
 
 ```ssh
 mkdir packages/db
@@ -389,15 +389,13 @@ pnpm add @prisma/client @prisma/adapter-pg pg dotenv
 ```
 
 packages/db/tsconfig.json
-```typescript
-
+```json
 {
     "extends": "@repo/typescript-config/base.json",
     "compilerOptions": {
   
     // "rootDir": "./src",
-    // "outDir": "./dist",
-
+    "outDir": "./dist",
 
     // "module": "esnext",
     // "moduleResolution": "bundler",
@@ -408,7 +406,6 @@ packages/db/tsconfig.json
 
     // "target": "ES2023",
     
-    
     // For nodejs:
     "lib": ["esnext"],
     "types": ["node"],
@@ -416,7 +413,7 @@ packages/db/tsconfig.json
 
     // Other Outputs
     // "sourceMap": true,
-    // "declaration": true,
+    "declaration": true,
     // "declarationMap": true,
 
     // Stricter Typechecking Options
@@ -441,14 +438,15 @@ packages/db/tsconfig.json
     // "skipLibCheck": true,
 
     // "esModuleInterop": true,
-    "ignoreDeprecations" : "6.0"   
-  }
+    // "ignoreDeprecations" : "6.0"
+  },
+  "include": ["src", "prisma/generated"]
 }
 ```
 
 
 packages/db/package.json
-```typescript
+```json
 
 {
   "name": "@repo/db",
@@ -569,8 +567,9 @@ npx prisma generate
 
 src/client.ts
 ```typescript
-import { PrismaClient } from "../prisma/generated/client"; 
+import { PrismaClient } from "../prisma/generated/client.js"; 
 import { PrismaPg } from "@prisma/adapter-pg"; 
+
 
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient; };
@@ -579,15 +578,15 @@ const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL, 
 }); 
 
-const prisma = globalForPrisma.prisma || new PrismaClient({ adapter, });
+export const prisma = globalForPrisma.prisma || new PrismaClient({ adapter, });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma; 
-export default prisma; 
+// export default prisma; 
 ```
 
 src/index.ts
 ```typescript
-export * from './client';
+export * from './client.js';
 ```
 
 
@@ -595,17 +594,18 @@ packages/db/package.json
 
 - added "exports:{ "./client": "./src/index.ts" }"
 
-```typescript
-
+```json
 {
   "name": "@repo/db",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "exports":{
-    "./client":"./src/index.ts"
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    "./client": "./dist/src/index.js"
   },
   "scripts": {
+    "build": "tsc -b",
     "db:test": "tsx src/index.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
@@ -620,12 +620,388 @@ packages/db/package.json
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "type": "module",
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "dotenv": "^17.4.2",
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
   }
 }
 
 ```
+
+
+## Step 8 -
+- Created packages/backend-common and packages/common packages
+- For now the packages/backend-common consists of JWT helper
+- For now the packages/common consists of ZOD schemas
+
+<br/>
+
+- packages/backend-common
+
+```sh
+mkdir packages/backend-common
+cd packages/backend-common
+
+pnpm init
+touch tsconfig.json
+```
+
+backend-common/package.json
+
+```json
+{
+  "name": "@repo/backend-common",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^22.15.3"
+  },
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./config": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}
+```
+
+tsconfig.josn
+
+```json
+{
+    "extends": "@repo/typescript-config/base.json",
+    "compilerOptions": {
+        "rootDir": "./src",
+        "outDir": "./dist",
+        "types": ["node"],
+  }
+}
+```
+
+src/jwt/jwtSecret.ts
+
+```typescript
+export const JWT_SECRET = process.env.JWT_SECRET;
+```
+
+src/index.ts
+
+```typescript
+export * as secret from "./jwt/jwtSecret.js";
+```
+
+
+- packages/common
+
+```sh
+mkdir packages/common
+cd packages/common
+
+pnpm init
+touch tsconfig.json
+```
+
+common/package.json
+
+```json
+{
+  "name": "@repo/common",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./types": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}
+
+```
+
+common/tsconfig.json
+
+```json
+{
+    "extends": "@repo/typescript-config/base.json",
+    "compilerOptions": {
+        "rootDir": "./src",
+        "outDir": "./dist",
+        "declaration": true
+    },
+    "include": ["src"]
+}
+```
+
+src/index.ts
+
+```typescript
+import {z} from "zod"
+
+export const CreateUserSchema = z.object({
+    email: z.email(),
+    username: z.string().min(5).max(20),
+    password: z.string().min(8).max(20)
+    .regex(/[A-Z]/, {message: "Password must contain at least one UPPERCASE letter."})
+    .regex(/[a-z]/, {message: "Passowd must contain at least one lowercase letter."})
+    .regex(/[0-9]/, {message: "Password must contain at least one Number."})
+    .regex(/[^A-Za-z0-9]/, {message: "Password must contain at least one Special Character."})
+})
+
+
+export const SigninSchema = z.object({
+    email: z.email(),
+    password: z.string().min(8).max(20)
+    .regex(/[A-Z]/, {message: "Password must contain at least one UPPERCASE letter."})
+    .regex(/[a-z]/, {message: "Passowd must contain at least one lowercase letter."})
+    .regex(/[0-9]/, {message: "Password must contain at least one Number."})
+    .regex(/[^A-Za-z0-9]/, {message: "Password must contain at least one Special Character."})
+})
+
+
+export const CreateRoomSchema = z.object({
+    name: z.string().min(3).max(20)
+})
+```
+
+
+## Step 9 -
+- added SignUp and SignIn api endpoint in apps/http-backend for user
+- added @repo/backend-common, @repo/common, @repo/db and other npm packages as dependencies/devDependencies for apps/http-backend
+
+
+http-backend/package.json
+
+```json
+{
+  "name": "http-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "dev": "pnpm run build && pnpm run start"
+  },
+  "dependencies": {
+    "@repo/backend-common": "workspace:*",
+    "@repo/common": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/express": "^5.0.6",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.3"
+  }
+}
+```
+
+http-backend/src/index.ts
+
+```typescript
+import "dotenv/config";
+import express from "express"
+import cors from "cors"
+import userRouter from "./routes/user"
+import { secret } from "@repo/backend-common/config";
+
+const app = express()
+app.use(express.json())
+app.use(cors())
+
+
+app.use("/api/v1/user", userRouter)
+
+
+async function main(){
+
+    app.listen(3001, ()=> {
+        console.log("Http Server is running on port 3001")
+    })
+}
+
+main().catch(err => console.log(err));
+```
+
+http-backend/src/routes/user.ts
+
+```typescript
+import { Router } from "express";
+import {CreateUserSchema, SigninSchema} from "@repo/common/types"
+import bcrypt from "bcrypt"
+import { prisma } from "@repo/db/client"
+import jwt from "jsonwebtoken"
+import { secret } from "@repo/backend-common/config";
+
+
+const userRouter : Router = Router();
+
+userRouter.post("/signup", async (req, res)=> {
+
+    const parsedData = CreateUserSchema.safeParse(req.body)
+
+    if(!parsedData.success){
+        res.status(400).json({
+            message: "Invalid Input Format",
+            error: parsedData.error
+        })
+        return;
+    }
+
+    const { email,username,password} = parsedData.data;
+
+    try {
+        const existingUser = await prisma.user.findFirst({
+            where:{
+                email
+            }
+        })
+
+        if(existingUser){
+            res.status(403).json({
+                message: "Email Already Exists"
+            })
+            return;
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10)
+
+        const user = await prisma.user.create({
+            data: {
+                email: email,
+                username: username,
+                password: hashedPassword
+            }
+        })
+
+
+        res.status(200).json({
+            message: "You are signed up",
+            user: {
+                email: user.email,
+                username: user.username
+            }
+        })
+    }
+    catch(err){
+        console.error(err)
+
+
+        res.status(400).json({
+            message: "Error in SignUp api endpoint",
+            error: err
+        })
+    }
+})
+
+
+
+userRouter.post("/signin", async (req, res)=> {
+
+    const parsedData = SigninSchema.safeParse(req.body)
+
+    if(!parsedData.success){
+        res.status(400).json({
+            message: "Invalid Input Format",
+            error: parsedData.error
+        })
+        return;
+    }
+
+    const { email, password } = parsedData.data;
+
+    try{
+
+        const user = await prisma.user.findUnique({
+            where: {
+                email
+            }
+        })
+
+        if(!user){
+            res.status(400).json({
+                message: "Invalid Credentials"
+            })
+            return;
+        }
+
+        const isValidPassword = await bcrypt.compare(password, user.password)
+
+        if(!isValidPassword){
+            res.status(400).json({
+                message: "Invalid Credentials"
+            })
+            return;
+        }
+
+        const token = jwt.sign({id: user.id}, secret.JWT_SECRET!)
+
+        res.status(200).json({
+            message: "Logged In Succesfully",
+            token: token
+        })
+    }
+    catch(err){
+        console.error(err)
+
+        res.status(400).json({
+            message: "Error in SignIn api endpoint",
+            error: err
+        })
+    }
+})
+
+
+export default userRouter;
+```
+
+
+.env.example
+
+```
+DATABASE_URL="database://getADatabaseURL.com"
+JWT_SECRET=SecretForJwtToken
+```
+
