@@ -311,7 +311,7 @@ app.listen(3001, ()=>{
 - run "pnpm turbo run build --dry" for dry running build script and check the "outputs" for each project
 
 root/turbo.json
-```json
+```typescript
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
@@ -389,7 +389,7 @@ pnpm add @prisma/client @prisma/adapter-pg pg dotenv
 ```
 
 packages/db/tsconfig.json
-```json
+```typescript
 {
     "extends": "@repo/typescript-config/base.json",
     "compilerOptions": {
@@ -446,7 +446,7 @@ packages/db/tsconfig.json
 
 
 packages/db/package.json
-```json
+```typescript
 
 {
   "name": "@repo/db",
@@ -594,7 +594,7 @@ packages/db/package.json
 
 - added "exports:{ "./client": "./src/index.ts" }"
 
-```json
+```typescript
 {
   "name": "@repo/db",
   "version": "1.0.0",
@@ -651,7 +651,7 @@ touch tsconfig.json
 
 backend-common/package.json
 
-```json
+```typescript
 {
   "name": "@repo/backend-common",
   "version": "1.0.0",
@@ -725,7 +725,7 @@ touch tsconfig.json
 
 common/package.json
 
-```json
+```typescript
 {
   "name": "@repo/common",
   "version": "1.0.0",
@@ -807,7 +807,7 @@ export const CreateRoomSchema = z.object({
 
 http-backend/package.json
 
-```json
+```typescript
 {
   "name": "http-backend",
   "version": "1.0.0",
@@ -1157,3 +1157,340 @@ async function main(){
 main().catch(err => console.log(err));
 ```
 
+## Step 11 - 
+- added ws-backend logic for simple chat app (user can connect to multiple room to send and recieve real-time data/message)
+- added http-backend api endpoint (chatRouter) to retrieve data/message stored in db (past data, limited to 50)
+
+
+```sh
+cd apps/ws-backend
+pnpm add jsonwebtoken @types/jsonwebtoken dotenv
+pnpm --filter ws-backend add @repo/db --workspace
+
+cd ../..
+pnpm install
+```
+
+
+ws-backend/src/index.ts
+
+```typescript
+import "dotenv/config";
+import { WebSocket, WebSocketServer } from "ws"
+import http from "http"
+import jwt from "jsonwebtoken"
+import { secret } from "@repo/backend-common/config";
+import { prisma } from "@repo/db/client";
+
+const server = http.createServer()
+const wss = new WebSocketServer({ server })
+
+
+const PORT = process.env.PORT || 8080;
+
+server.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
+
+
+interface User {
+  ws: WebSocket,
+  rooms: Set<number>,
+  userId: number;
+}
+
+const users: User[] =  []
+
+
+function checkUser(token: string): number | null {
+  try{
+    const decoded = jwt.verify(token, secret.JWT_SECRET)
+
+    if(typeof decoded == "string") {
+      return null;
+    }
+
+    return decoded.id ?? null;
+  }
+  catch(err){
+    console.error(err)
+    return null
+  }
+}
+
+
+wss.on('connection', function connection(ws, request) {
+  ws.on('error', (err)=> {
+    console.error("WebSocket error: ", err)
+  });
+
+  const url = request.url;
+  if(!url){ return }
+
+  const queryParams = new URLSearchParams(url.split('?')[1])
+  const token = queryParams.get('token') || "";
+
+  // const parsedUrl = new URL(url, `ws://${request.headers.host}`);
+  // const token = parsedUrl.searchParams.get("token") ?? "";
+  const userId = checkUser(token)
+
+  if(!userId){
+    ws.close();
+    return;
+  }
+
+  const user: User = {
+    userId,
+    rooms: new Set(),
+    ws
+  }
+
+  users.push( user )
+
+  ws.on("close", ()=> {
+    const index = users.indexOf(user)
+
+    if(index !== -1 ){
+      users.splice(index, 1)
+    }
+
+    console.log(`User: ${user.userId}, disconnected` )
+  })
+
+  
+
+  ws.on('message', async (data, isBinary) => {
+    if (isBinary) {
+        ws.close(1003, "Binary messages are not supported");
+        return;
+    }
+
+    const message = data.toString();
+
+    let parsedData;
+
+    try{
+      parsedData = JSON.parse(message)
+
+      if(typeof parsedData.type !== "string" || typeof parsedData.roomId !== "number"){
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "Invalid Data format"
+          })
+        )
+        return;
+      }
+    }
+    catch{
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: "Invalid JSON"
+        })
+      )
+      return;
+    }
+    
+    if(parsedData.type === "join_room"){
+      // const user = users.find((u)=> u.ws === ws)
+
+      // if(!user){
+      //   ws.close()
+      //   return;
+      // }
+
+      if (user.rooms.has(parsedData.roomId)){
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "User Already in this room"
+          })
+        )
+        return;
+      }
+
+      try{
+        const room = await prisma.room.findUnique({
+          where:{
+            id: parsedData.roomId
+          }
+        })
+
+        if(!room){
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              message: "Room does not exist"
+            })
+          )
+          return;
+        }
+
+        user.rooms.add(parsedData.roomId)
+
+        ws.send(
+          JSON.stringify({
+            type: "join_room_success",
+            roomId: parsedData.roomId
+          })
+        )
+      }
+      catch(err){
+        console.error(err)
+
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "Error in db query during join_room"
+          })
+        )
+      }
+    }
+
+    if(parsedData.type === "leave_room"){
+      // const user = users.find((u)=> u.ws === ws)
+
+      // if(!user){
+      //   ws.close()
+      //   return;
+      // }
+      
+      const removed = user.rooms.delete(parsedData.roomId)
+
+      if (!removed) {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "User is not in this room"
+          })
+        );
+        return;
+      }
+
+      ws.send(
+        JSON.stringify({
+          type: "leave_room_success",
+          roomId: parsedData.roomId
+        })
+      );
+    }
+
+
+    if(parsedData.type === "chat"){
+      const roomId = parsedData.roomId;
+      const message = parsedData.message;
+
+      if (!user.rooms.has(roomId)) {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "You are not a member of this room"
+          })
+        );
+        return;
+      }
+
+      await prisma.chat.create({
+        data: {
+          message,
+          roomId,
+          userId
+        }
+      })
+
+      users.forEach((connectedUser) => {
+        if(connectedUser.rooms.has(roomId)){
+          connectedUser.ws.send(
+            JSON.stringify({
+              type: "chat",
+              message: message,
+              roomId,
+              userId
+            })
+          )
+        }
+      })
+    }
+  });
+});
+```
+
+ws-backend/.env.example
+```
+DATABASE_URL="database://getADatabaseURL.com"
+JWT_SECRET=SecretForJwtToken
+```
+
+apps/http-backend/src/routes/chat.ts
+
+```typescript
+import { prisma } from "@repo/db/client";
+import { Router } from "express";
+import { userAuthMiddleware } from "../middlewares/userAuthMiddleware";
+
+const chatRouter: Router = Router();
+
+
+chatRouter.get("/:roomId", userAuthMiddleware, async (req, res) => {
+    try{
+        const roomId = Number(req.params.roomId)
+
+        const messages = await prisma.chat.findMany({
+            where: {
+                roomId: roomId
+            },
+            orderBy: {
+                id: "desc"
+            },
+            take: 50
+        })
+
+        res.status(200).json({
+            messages
+        })
+    }
+    catch(err){
+        console.error(err)
+        res.status(400).json({
+            message: "Error on retrieving chats",
+            error: err
+        })
+    }
+    
+})
+
+
+export default chatRouter;
+```
+
+http-backend/src/index.ts
+
+```typescript
+import "dotenv/config";
+import express from "express"
+import cors from "cors"
+import userRouter from "./routes/user"
+import { secret } from "@repo/backend-common/config";
+import roomRouter from "./routes/room";
+import chatRouter from "./routes/chat";
+
+const app = express()
+app.use(express.json())
+app.use(cors())
+
+
+app.use("/api/v1/user", userRouter)
+app.use("/api/v1/room", roomRouter)
+app.use("/api/v1/chat", chatRouter)
+
+
+async function main(){
+
+    app.listen(3001, ()=> {
+        console.log("Http Server is running on port 3001")
+    })
+}
+
+main().catch(err => console.log(err));
+```

@@ -109,12 +109,24 @@ importers:
       '@repo/common':
         specifier: workspace:*
         version: link:../../packages/common
+      '@repo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
       ws:
         specifier: ^8.21.0
         version: 8.21.0

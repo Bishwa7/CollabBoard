@@ -4,6 +4,7 @@ import cors from "cors"
 import userRouter from "./routes/user"
 import { secret } from "@repo/backend-common/config";
 import roomRouter from "./routes/room";
+import chatRouter from "./routes/chat";
 
 const app = express()
 app.use(express.json())
@@ -12,6 +13,7 @@ app.use(cors())
 
 app.use("/api/v1/user", userRouter)
 app.use("/api/v1/room", roomRouter)
+app.use("/api/v1/chat", chatRouter)
 
 
 async function main(){
