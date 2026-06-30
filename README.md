@@ -1494,3 +1494,254 @@ async function main(){
 
 main().catch(err => console.log(err));
 ```
+
+
+
+# Frontend 
+
+## Step 1 - 
+- created a Nextjs project (web-frontend) for frontend and configured it.
+
+```sh
+cd apps/
+npx create-next-app@latest
+```
+
+web-frontend/package.json
+
+```typescript
+{
+  "name": "web-frontend",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3030",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint --max-warnings 0",
+    "check-types": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/ui": "workspace:*",
+    "axios": "^1.18.1",
+    "next": "16.2.9",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2"
+  }
+}
+```
+
+web-frontend/tsconfig.json
+
+```typescript
+{
+  "extends": "@repo/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "strictNullChecks": true
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    "next.config.js",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}
+
+```
+
+web-frontend/turbo.json
+
+```typescript
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
+    }
+  }
+}
+```
+
+
+## Step 2 -
+- Created SignUp and SignIn pages and connected to backend API endpoints
+- created a new component in packages/ui (labelledInput.tsx)
+- modified packages/ui/src/button.tsx
+
+app/(pages)/(auth)/signin/page.tsx
+
+```typescript
+import AuthPage from "../../../../components/AuthPage";
+
+
+export default function SignIn() {
+    return (
+        <AuthPage isSignin={true} />
+    )
+}
+```
+
+pp/(pages)/(auth)/signup/page.tsx
+
+```typescript
+import AuthPage from "../../../../components/AuthPage";
+
+export default function SignUp() {
+    return (
+        <AuthPage isSignin={false} />
+    )
+}
+```
+
+components/AuthPage.tsx
+
+```typescript
+import { LabelledInput } from "@repo/ui/labelledInput";
+import { Button } from "@repo/ui/button";
+import { signin } from "../actions/auth/signin";
+import { signup } from "../actions/auth/signup";
+
+
+export default function AuthPage({isSignin}: {isSignin: boolean}) {
+    return <div className="h-screen flex justify-center flex-col">
+        <div className="flex justify-center">
+            <div className="block min-w-sm max-w-lg p-6 bg-white border border-gray-200 rounded-lg shadow hover:bg-gray-100 ">
+                <div>
+                    <div className="px-10">
+                        <div className="text-3xl font-extrabold text-rose-300 flex justify-center">
+                            {isSignin? "SIGN IN" : "SIGN UP"}
+                        </div>
+                    </div>
+                    <div className="pt-2">
+                        <form action={isSignin? signin: signup}>
+                            <LabelledInput label="Email" placeholder="bishwanath@gmail.com" name="email" labelClassName="block mb-2 text-sm text-black font-semibold pt-4" inputClassName="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" />
+                            {isSignin? null : <LabelledInput label="Username" placeholder="bishwanath" name="username" labelClassName="block mb-2 text-sm text-black font-semibold pt-4" inputClassName="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" />}
+                            <LabelledInput label="Password" type={"password"} placeholder="123456" name="password" labelClassName="block mb-2 text-sm text-black font-semibold pt-4" inputClassName="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" />
+                            <Button className="mt-8 w-full text-white bg-gray-800 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 cursor-pointer active:scale-95"> {isSignin? "Sign In" : "Sign Up"} </Button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+```
+
+actions/auth/signin.ts
+
+```typescript
+"use server";
+
+import axios from "axios";
+
+export async function signin(formData: FormData){
+    const email = formData.get("email")
+    const password = formData.get("password")
+
+    const response = await axios.post(`${process.env.BACKEND_URL}/api/v1/user/signin`,
+        {
+            email,
+            password
+        }
+    )
+
+    return response.data
+}
+```
+
+actions/auth/signup.ts
+
+```typescript
+"use server";
+
+import axios from "axios";
+
+export async function signup(formData: FormData){
+    const email = formData.get("email")
+    const username = formData.get("username")
+    const password = formData.get("password")
+    
+    const response = await axios.post(`${process.env.BACKEND_URL}/api/v1/user/signup`,
+        {
+            email,
+            username,
+            password
+        }
+    )
+
+    return response.data
+}
+```
+
+.env.example
+
+```
+BACKEND_URL=http://localhost:8080
+```
+
+
+packages/ui/src/labelledInput.tsx
+
+```typescript
+
+
+interface LabelledInputType {
+    label: string;
+    placeholder: string;
+    type?: string;
+    labelClassName?: string;
+    inputClassName?: string;
+    name?: string;
+}
+
+export function LabelledInput({ label, placeholder, type, labelClassName, inputClassName, name }: LabelledInputType) {
+    return <div>
+        <label className={labelClassName}>{label}</label>
+        <input name={name} type={type || "text"} id="first_name" className={inputClassName} placeholder={placeholder} required />
+    </div>
+}
+```
+
+
+packages/ui/src/button.tsx
+
+```typescript
+// "use client";
+
+import { ReactNode } from "react";
+
+interface ButtonProps {
+  children: ReactNode;
+  className?: string;
+}
+
+export const Button = ({ children, className }: ButtonProps) => {
+  return (
+    <button
+      className={className}
+      type="submit"
+    >
+      {children}
+    </button>
+  );
+};
+
+```
