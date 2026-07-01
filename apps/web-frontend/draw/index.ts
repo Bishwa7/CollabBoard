@@ -1,5 +1,20 @@
 
 
+type Shape = {
+    type: "rect";
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+} | {
+    type: "circle";
+    centerX: number;
+    centerY: number;
+    radius: number;
+}
+
+const existingShapes : Shape[] = []
+
 export function initDraw(canvas: HTMLCanvasElement){
     // canvas size
     canvas.width = window.innerWidth;
@@ -30,8 +45,21 @@ export function initDraw(canvas: HTMLCanvasElement){
         startY = y;
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
         isDrawing = false;
+
+        const { x, y } = getMousePos(e, canvas)
+
+        const width = x - startX;
+        const height = y - startY;
+
+        existingShapes.push({
+            type: "rect",
+            x: startX,
+            y: startY,
+            width,
+            height
+        })
     };
 
     const handleMouseLeave = () => {
@@ -46,7 +74,7 @@ export function initDraw(canvas: HTMLCanvasElement){
         const width = x - startX;
         const height = y - startY;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        clearCanvas(existingShapes, ctx, canvas)
 
         ctx.strokeStyle = "white";
         ctx.lineWidth = 2;
@@ -65,4 +93,17 @@ export function initDraw(canvas: HTMLCanvasElement){
         canvas.removeEventListener("mouseup", handleMouseUp);
         canvas.removeEventListener("mouseleave", handleMouseLeave);
     };
+}
+
+function clearCanvas(existingShapes: Shape[], ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement){
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    existingShapes.map((shape) => {
+        if(shape.type === "rect") {
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(shape.x , shape.y , shape.width , shape.height)
+        }
+    })
 }
