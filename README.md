@@ -1495,6 +1495,43 @@ async function main(){
 main().catch(err => console.log(err));
 ```
 
+## Step 12 -
+- added a http-backend endpoint to check if room with that Id exists or not
+
+http-backend/src/routes/room.ts
+
+```typescript
+
+roomRouter.get("/:roomId", userAuthMiddleware, async (req, res) => {
+    try{
+        const roomId = Number(req.params.roomId);
+
+        const room = await prisma.room.findUnique({
+            where: {
+                id: roomId,
+            },
+        });
+
+        if (!room) {
+            return res.status(404).json({
+                message: "Room not found",
+            });
+        }
+
+        res.status(200).json({
+            room,
+        });
+    }
+    catch(err){
+        console.error(err)
+        res.status(404).json({
+            message: "Error in checkin room if exists api endpoit",
+            error: err
+        })
+    }
+});
+
+```
 
 
 # Frontend 
@@ -1970,4 +2007,368 @@ function clearCanvas(existingShapes: Shape[], ctx: CanvasRenderingContext2D, can
     })
 }
 ```
+
+## Step 5 - 
+- added a middleware in web-frontend so that user can visit protected pages only after signing in
+- added redirect logic for signup and redirect and jwt storing in http-only cookie logic for signin
+- created pages /lobby , /create-room , /join-room
+
+<br />
+
+- added a middleware in web-frontend so that user can visit protected pages only after signing in
+
+web-frontend/proxy.ts
+
+```typescript
+import { middlewareHandler } from "./lib/authMiddleware";
+
+export { middlewareHandler as proxy };
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+};
+```
+
+web-frontend/lib/authmiddleware.ts
+
+```typescript
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+import { secret } from "@repo/backend-common/config";
+
+const publicRoutes = [
+    "/",
+    "/signin",
+    "/signup",
+    "/about",
+    "/pricing",
+    "/contact",
+];
+
+export function middlewareHandler(request: NextRequest) {
+
+
+    const { pathname } = request.nextUrl;
+
+    // Allow public routes
+    if (publicRoutes.includes(pathname)) {
+        return NextResponse.next();
+    }
+
+    const token = request.cookies.get("token")?.value;
+
+    if (!token) {
+        return NextResponse.redirect(new URL("/signin", request.url));
+    }
+
+    try {
+        jwt.verify(token, secret.JWT_SECRET);
+        return NextResponse.next();
+    } catch {
+        return NextResponse.redirect(new URL("/signin", request.url));
+    }
+
+}
+```
+
+
+- added redirect logic for signup and redirect and jwt storing in http-only cookie logic for signin
+
+web-frontend/actions/auth/signup.ts
+
+```typescript
+"use server";
+
+import axios from "axios";
+import { redirect } from "next/navigation";
+
+export async function signup(formData: FormData){
+    const email = formData.get("email")
+    const username = formData.get("username")
+    const password = formData.get("password")
+    
+    await axios.post(`${process.env.BACKEND_URL}/api/v1/user/signup`,
+        {
+            email,
+            username,
+            password
+        }
+    )
+
+    redirect("/signin")
+}
+```
+
+web-frontend/actions/auth/signin.ts
+
+```typescript
+"use server";
+
+import axios from "axios";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+export async function signin(formData: FormData){
+    const email = formData.get("email")
+    const password = formData.get("password")
+
+    const response = await axios.post(`${process.env.BACKEND_URL}/api/v1/user/signin`,
+        {
+            email,
+            password
+        }
+    )
+    const token = response.data.token;
+
+    (await cookies()).set("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        // optional: expires/maxAge
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
+    redirect("/lobby")
+}
+```
+
+- created pages /lobby , /create-room , /join-room
+
+web-frontend/app/(pages)/lobby/page.tsx
+
+```typescript
+import Link from "next/link";
+
+export default function LobbyPage() {
+    return (
+        <div className="flex h-screen items-center justify-center">
+            <div className="space-y-4">
+                <h1 className="text-3xl font-bold">
+                    Welcome
+                </h1>
+
+                <Link
+                    href="/create-room"
+                    className="block rounded bg-blue-600 px-6 py-3 text-white"
+                >
+                    Create Room
+                </Link>
+
+                <Link
+                    href="/join-room"
+                    className="block rounded bg-green-600 px-6 py-3 text-white"
+                >
+                    Join Room
+                </Link>
+            </div>
+        </div>
+    );
+}
+```
+
+web-frontend/app/(pages)/create-room/page.tsx
+
+```typescript
+import { createRoom } from "../../../actions/room/createRoom";
+
+
+export default function CreateRoomPage() {
+    return (
+        <div className="flex h-screen items-center justify-center">
+            <div className="w-full max-w-md rounded-lg border bg-white p-6 shadow">
+                <h1 className="mb-6 text-center text-3xl font-bold">
+                    Create Room
+                </h1>
+
+                <form action={createRoom} className="space-y-4">
+                    <div>
+                        <label className="mb-2 block font-semibold">
+                            Room Name
+                        </label>
+
+                        <input
+                            type="text"
+                            name="name"
+                            placeholder="Enter room name"
+                            required
+                            className="w-full rounded-lg border p-2"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="w-full rounded-lg bg-blue-600 py-2 text-white"
+                    >
+                        Create Room
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}
+```
+
+
+web-frontend/actions/room/createRoom.ts
+
+```typescript
+"use server";
+
+import axios from "axios";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+export async function createRoom(formData: FormData) {
+    const name = formData.get("name");
+
+    const token = (await cookies()).get("token")?.value;
+
+    if (!token) {
+        redirect("/signin");
+    }
+
+    const response = await axios.post(
+        `${process.env.BACKEND_URL}/api/v1/room/create`,
+        {
+            name,
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    const roomId = response.data.roomId;
+
+    redirect(`/canvas/${roomId}`);
+}
+```
+
+
+web-frontend/app/(pages)/join-room/page.tsx
+
+```typescript
+import JoinRoomForm from "../../../components/JoinRoomForm";
+
+
+export default function JoinRoomPage() {
+    return (
+        <div className="flex h-screen items-center justify-center">
+            <div className="w-full max-w-md rounded-lg border bg-white p-6 shadow">
+                <h1 className="mb-6 text-center text-3xl font-bold">
+                    Join Room
+                </h1>
+
+                <JoinRoomForm />
+            </div>
+        </div>
+    );
+}
+```
+
+
+web-frontend/actions/room/joinRoom.ts
+
+```typescript
+"use server";
+
+import axios from "axios";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+export async function joinRoom(prevState: { error: string | null }, formData: FormData) {
+    const roomId = formData.get("room");
+
+
+    const token = (await cookies()).get("token")?.value;
+
+    if (!token) {
+        redirect("/signin");
+    }
+
+    try {
+        await axios.get(
+            `${process.env.BACKEND_URL}/api/v1/room/${roomId}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            }
+        );
+
+        
+    } catch(err) {
+        console.log(err);
+
+        if (axios.isAxiosError(err)) {
+            console.log(err.response?.status);
+            console.log(err.response?.data);
+
+            return {
+                error: err.response?.data?.message ?? "Something went wrong",
+            };
+        }
+
+        return {
+            error: "Something went wrong",
+        };
+    }
+
+
+    redirect(`/canvas/${roomId}`);
+}
+```
+
+web-frontend/components/JoinRoomForm.ts
+
+```typescript
+"use client";
+
+import { useActionState } from "react";
+import { joinRoom } from "../actions/room/joinRoom";
+
+const initialState = {
+    error: "",
+};
+
+export default function JoinRoomForm() {
+    const [state, formAction] = useActionState(joinRoom, initialState);
+
+    return (
+        <form action={formAction} className="space-y-4">
+            <div>
+                <label
+                    htmlFor="room"
+                    className="mb-2 block font-semibold"
+                >
+                    Room Name/ID
+                </label>
+
+                <input
+                    id="room"
+                    name="room"
+                    type="text"
+                    placeholder="Enter room ID"
+                    required
+                    className="w-full rounded-lg border p-2"
+                />
+            </div>
+
+            <button
+                type="submit"
+                className="w-full rounded-lg bg-green-600 py-2 text-white"
+            >
+                Join Room
+            </button>
+
+            {state.error && (
+                <p className="text-red-500">{state.error}</p>
+            )}
+        </form>
+    );
+}
+```
+
 

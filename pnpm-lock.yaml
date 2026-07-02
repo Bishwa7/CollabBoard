@@ -103,12 +103,21 @@ importers:
 
   apps/web-frontend:
     dependencies:
+      '@repo/backend-common':
+        specifier: workspace:*
+        version: link:../../packages/backend-common
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
       axios:
         specifier: ^1.18.1
         version: 1.18.1
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
       next:
         specifier: 16.2.9
         version: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

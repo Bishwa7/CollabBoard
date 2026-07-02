@@ -55,4 +55,35 @@ roomRouter.post("/create", userAuthMiddleware, async (req, res) => {
 })
 
 
+
+
+roomRouter.get("/:roomId", userAuthMiddleware, async (req, res) => {
+    try{
+        const roomId = Number(req.params.roomId);
+
+        const room = await prisma.room.findUnique({
+            where: {
+                id: roomId,
+            },
+        });
+
+        if (!room) {
+            return res.status(404).json({
+                message: "Room not found",
+            });
+        }
+
+        res.status(200).json({
+            room,
+        });
+    }
+    catch(err){
+        console.error(err)
+        res.status(404).json({
+            message: "Error in checkin room if exists api endpoit",
+            error: err
+        })
+    }
+});
+
 export default roomRouter;
